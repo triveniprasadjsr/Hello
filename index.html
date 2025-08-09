@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Triveni Education - RRB JE Quiz System</title>
+    <title>Nippon Steel GET Entrance Test - 2025</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -84,23 +83,47 @@
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<link rel="stylesheet" href="/index.css">
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // Make firebase instances available globally
+        window.firebase = { initializeApp, getFirestore, doc, getDoc, setDoc, collection, onSnapshot, addDoc };
+    </script>
 </head>
 <body class="bg-gray-900 text-gray-200 transition-colors duration-300">
     <div id="root"></div>
 
     <script type="text/babel">
-        // --- Embedded: types.ts ---
-        // All type definitions are included here.
-        // They will be available to all components below.
-        
+        // --- Firebase Imports ---
+        // These are now imported in the main script tag, but we need to reference them
+        // from the global window object within our React components.
+        const { initializeApp, getFirestore, doc, getDoc, setDoc, collection, onSnapshot, addDoc } = window.firebase;
+
+        // --- Firebase Configuration ---
+        // IMPORTANT: Replace this with your own Firebase project's configuration!
+        // You can get this from the Firebase console.
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
         // --- Embedded: constants.ts ---
         const DEFAULT_QUIZ_DATA = {
             "Physics": { "questions": [ { "q": "What is the SI unit of force?", "o": ["Joule", "Newton", "Watt", "Pascal"], "a": 1 }, { "q": "Which law states F=ma?", "o": ["Conservation of Energy", "Newton's First Law", "Newton's Second Law", "Law of Gravitation"], "a": 2 } ] },
             "Chemistry": { "questions": [ { "q": "What is the chemical symbol for gold?", "o": ["Go", "Gd", "Au", "Ag"], "a": 2 }, { "q": "Which of the following is a noble gas?", "o": ["Oxygen", "Nitrogen", "Helium", "Hydrogen"], "a": 2 } ] },
             "Biology": { "questions": [ { "q": "What is the basic unit of life?", "o": ["Tissue", "Organ", "Cell", "Molecule"], "a": 2 }, { "q": "Which system is responsible for blood circulation?", "o": ["Digestive", "Respiratory", "Circulatory", "Nervous"], "a": 2 } ] }
         };
-        const DEFAULT_QUIZ_TITLE = 'RRB JE Quiz System';
+        const DEFAULT_QUIZ_TITLE = 'Nippon Steel GET Entrance Test - 2025';
         
         // --- Embedded: components/Modals.tsx ---
         const Modal = ({ isOpen, onClose, children, maxWidth = 'max-w-2xl' }) => {
@@ -693,26 +716,11 @@
                 return () => window.removeEventListener('beforeunload', handleBeforeUnload);
             }, [timerActive]);
 
+            // This component no longer uses localStorage for proctoring data
+            // as it's not suitable for a multi-user environment.
+            // A more robust solution would involve Firestore or Realtime Database.
             const cleanupProctoringData = (email) => {
-                if (!email) return;
-                try {
-                    const sessionsData = localStorage.getItem('proctoring_sessions');
-                    if (sessionsData) {
-                        const sessions = JSON.parse(sessionsData);
-                        if (sessions[email]) {
-                            delete sessions[email];
-                            localStorage.setItem('proctoring_sessions', JSON.stringify(sessions));
-                        }
-                    }
-                    const actionsData = localStorage.getItem('proctoring_actions');
-                    if (actionsData) {
-                        const actions = JSON.parse(actionsData);
-                        if (actions[email]) {
-                            delete actions[email];
-                            localStorage.setItem('proctoring_actions', JSON.stringify(actions));
-                        }
-                    }
-                } catch (error) { console.error("Error cleaning up proctoring data:", error); }
+                // Placeholder for future cloud-based cleanup
             };
 
             const totalQuestions = React.useMemo(() => Object.values(quizData).reduce((sum, subject) => sum + (subject.questions ? subject.questions.length : 0), 0), [quizData]);
@@ -785,37 +793,7 @@
             }, [step]);
             
             React.useEffect(() => {
-                if (timerActive && userInfo) {
-                    const canvas = document.createElement('canvas');
-                    const context = canvas.getContext('2d');
-                    canvas.width = 320;
-                    canvas.height = 240;
-
-                    proctoringIntervalRef.current = window.setInterval(() => {
-                        if (webcamFeedRef.current && webcamFeedRef.current.readyState >= 2 && context) {
-                            context.drawImage(webcamFeedRef.current, 0, 0, canvas.width, canvas.height);
-                            const snapshot = canvas.toDataURL('image/jpeg', 0.5);
-                            try {
-                                const sessionsData = localStorage.getItem('proctoring_sessions') || '{}';
-                                const sessions = JSON.parse(sessionsData);
-                                sessions[userInfo.email] = { userInfo, violationCount, webcamSnapshot: snapshot, lastSeen: Date.now() };
-                                localStorage.setItem('proctoring_sessions', JSON.stringify(sessions));
-                            } catch (e) { console.error("Could not update proctoring session", e); }
-                        }
-                        try {
-                            const actionsData = localStorage.getItem('proctoring_actions') || '{}';
-                            const actions = JSON.parse(actionsData);
-                            if (actions[userInfo.email]) {
-                                const action = actions[userInfo.email];
-                                delete actions[userInfo.email];
-                                localStorage.setItem('proctoring_actions', JSON.stringify(actions));
-                                if (action.action === 'terminate') disqualifyUserRef.current('Terminated by Administrator.');
-                                else if (action.action === 'warn' && action.message) showInfo(`Admin Warning: ${action.message}`);
-                            }
-                        } catch(e) { console.error("Could not check for proctoring actions", e); }
-                    }, 5000);
-                }
-                return () => { if (proctoringIntervalRef.current) clearInterval(proctoringIntervalRef.current); };
+                // Proctoring via localStorage is removed. A cloud solution is needed for this feature.
             }, [timerActive, userInfo, violationCount, showInfo]);
             
             React.useEffect(() => {
@@ -1120,68 +1098,9 @@
         
         // --- Embedded: components/AdminPanel.tsx ---
         const ProctoringComponent = () => {
-            const [activeSessions, setActiveSessions] = React.useState([]);
-            const [isWarningModalOpen, setWarningModalOpen] = React.useState(false);
-            const [studentToWarn, setStudentToWarn] = React.useState(null);
-            const [isTerminateConfirmOpen, setTerminateConfirmOpen] = React.useState(false);
-            const [studentToTerminate, setStudentToTerminate] = React.useState(null);
-
-            React.useEffect(() => {
-                const interval = setInterval(() => {
-                    try {
-                        const sessionsData = localStorage.getItem('proctoring_sessions');
-                        if (sessionsData) {
-                            const sessions = JSON.parse(sessionsData);
-                            const now = Date.now();
-                            const currentSessions = Object.values(sessions).filter(session => now - session.lastSeen < 10000);
-                            setActiveSessions(currentSessions);
-                        } else { setActiveSessions([]); }
-                    } catch (error) { setActiveSessions([]); }
-                }, 3000);
-                return () => clearInterval(interval);
-            }, []);
-            
-            const sendProctorAction = (email, action) => {
-                try {
-                    const actionsData = localStorage.getItem('proctoring_actions') || '{}';
-                    const actions = JSON.parse(actionsData);
-                    actions[email] = action;
-                    localStorage.setItem('proctoring_actions', JSON.stringify(actions));
-                } catch (error) { console.error("Error sending proctor action:", error); }
-            };
-            
-            const handleOpenWarningModal = (userInfo) => { setStudentToWarn(userInfo); setWarningModalOpen(true); };
-            const handleSendWarning = (message) => { if (studentToWarn) { sendProctorAction(studentToWarn.email, { action: 'warn', message }); setWarningModalOpen(false); setStudentToWarn(null); } };
-            const handleOpenTerminateConfirm = (userInfo) => { setStudentToTerminate(userInfo); setTerminateConfirmOpen(true); };
-            const handleConfirmTerminate = () => { if (studentToTerminate) { sendProctorAction(studentToTerminate.email, { action: 'terminate' }); setTerminateConfirmOpen(false); setStudentToTerminate(null); } };
-
-            if (activeSessions.length === 0) return <p className="text-gray-400 text-center py-8">No students are currently active in the exam.</p>;
-
-            return (
-                <div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        {activeSessions.map(session => (
-                            <div key={session.userInfo.email} className="bg-gray-900 rounded-lg shadow-lg overflow-hidden border border-gray-700">
-                                <img src={session.webcamSnapshot} alt={`${session.userInfo.name}'s webcam feed`} className="w-full h-48 object-cover bg-gray-800" />
-                                <div className="p-4">
-                                    <h4 className="text-lg font-bold truncate">{session.userInfo.name}</h4>
-                                    <p className="text-sm text-gray-400">Roll: {session.userInfo.rollNumber}</p>
-                                    <div className={`mt-3 mb-3 flex items-center justify-center p-2 rounded-md ${session.violationCount > 0 ? 'bg-red-900/50' : 'bg-green-900/50'}`}>
-                                        <i className={`fas ${session.violationCount > 0 ? 'fa-exclamation-triangle text-red-400' : 'fa-check-circle text-green-400'} mr-2`}></i>
-                                        <span className="font-semibold">{session.violationCount} Violations</span>
-                                    </div>
-                                    <div className="flex justify-around items-center pt-2 border-t border-gray-700">
-                                        <button onClick={() => handleOpenWarningModal(session.userInfo)} className="text-yellow-400 hover:text-yellow-300 transition-colors" title="Send Warning"><i className="fas fa-bullhorn fa-lg"></i></button>
-                                        <button onClick={() => handleOpenTerminateConfirm(session.userInfo)} className="text-red-500 hover:text-red-400 transition-colors" title="Terminate Exam"><i className="fas fa-ban fa-lg"></i></button>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                    {studentToWarn && <ProctorWarningInputModal isOpen={isWarningModalOpen} onClose={() => setWarningModalOpen(false)} onSend={handleSendWarning} studentName={studentToWarn.name} /> }
-                    {studentToTerminate && <ConfirmModal isOpen={isTerminateConfirmOpen} onClose={() => setTerminateConfirmOpen(false)} onConfirm={handleConfirmTerminate} title={`Terminate Exam for ${studentToTerminate.name}?`} message="This will immediately end the student's exam and disqualify them. This action cannot be undone." /> }
-                </div>
-            );
+            // This component requires a real-time database (like Firestore) to be effective.
+            // The localStorage implementation has been removed.
+            return <p className="text-gray-400 text-center py-8">Proctoring feature requires a cloud database setup to monitor students in real-time.</p>;
         };
         const RegisteredStudentsComponent = () => {
             const { registeredStudents } = useQuiz();
@@ -1351,8 +1270,8 @@
             const handleAddSubject = (name) => { if (quizData.hasOwnProperty(name)) showInfo(`Subject "${name}" already exists.`); else { addSubject(name); showInfo(`Subject "${name}" added.`); setActiveTab(name); } setIsSubjectModalOpen(false); };
             const handleConfirmDeleteSubject = () => { if(subjectToDelete) { deleteSubject(subjectToDelete); showInfo(`Subject "${subjectToDelete}" deleted.`); setSubjectToDelete(null); setActiveTab('proctoring'); } };
             const handleSaveQuizName = (name) => { setQuizTitle(name); showInfo('Quiz name updated successfully!'); setIsQuizNameModalOpen(false); };
-            const handleExport = () => { const dataStr = JSON.stringify(quizData, null, 2); const dataBlob = new Blob([dataStr], {type: "application/json"}); const url = URL.createObjectURL(dataBlob); const link = document.createElement('a'); link.href = url; link.download = 'quiz-data.json'; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url); };
-            const handleImport = (event) => { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const importedData = JSON.parse(e.target?.result); if (typeof importedData === 'object' && importedData !== null) { setQuizData(importedData); showInfo('Data imported! Click "Save All Changes" to persist them.'); } else { showInfo('Invalid JSON format.'); } } catch (error) { showInfo('Import failed. Not a valid JSON file.'); } }; reader.readAsText(file); event.target.value = ''; };
+            const handleExport = () => { const dataStr = JSON.stringify({quizTitle, quizData, registrationDate, examDate, examStartTime, examEndTime, quizDuration}, null, 2); const dataBlob = new Blob([dataStr], {type: "application/json"}); const url = URL.createObjectURL(dataBlob); const link = document.createElement('a'); link.href = url; link.download = 'quiz-config.json'; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url); };
+            const handleImport = (event) => { const file = event.target.files?.[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const imported = JSON.parse(e.target?.result); if (typeof imported === 'object' && imported !== null) { if(imported.quizData) setQuizData(imported.quizData); if(imported.quizTitle) setQuizTitle(imported.quizTitle); if(imported.registrationDate) setRegistrationDate(imported.registrationDate); if(imported.examDate) setExamDate(imported.examDate); if(imported.examStartTime) setExamStartTime(imported.examStartTime); if(imported.examEndTime) setExamEndTime(imported.examEndTime); if(imported.quizDuration) setQuizDuration(imported.quizDuration); showInfo('Data imported! Click "Save All Changes" to persist them.'); } else { showInfo('Invalid JSON format.'); } } catch (error) { showInfo('Import failed. Not a valid JSON file.'); } }; reader.readAsText(file); event.target.value = ''; };
 
             return (
                 <section>
@@ -1422,8 +1341,8 @@
         };
 
         const QuizProvider = ({ children }) => {
-            const [quizData, setQuizData] = React.useState(DEFAULT_QUIZ_DATA);
-            const [quizTitle, setQuizTitle] = React.useState(DEFAULT_QUIZ_TITLE);
+            const [quizData, setQuizData] = React.useState({});
+            const [quizTitle, setQuizTitle] = React.useState("Loading Quiz...");
             const [studentReports, setStudentReports] = React.useState([]);
             const [registeredStudents, setRegisteredStudents] = React.useState([]);
             const [registrationDate, setRegistrationDate] = React.useState(null);
@@ -1435,72 +1354,134 @@
             const [isInfoModalOpen, setIsInfoModalOpen] = React.useState(false);
             const [view, setView] = React.useState('registration');
             const [isAdminLoggedIn, setIsAdminLoggedIn] = React.useState(false);
+            const [isLoading, setIsLoading] = React.useState(true);
 
+            // Fetch all data from Firestore on initial load
             React.useEffect(() => {
-                try {
-                    const storedData = localStorage.getItem('rrbQuizData');
-                    const storedTitle = localStorage.getItem('rrbQuizTitle');
-                    const storedReports = localStorage.getItem('rrbQuizReports');
-                    const storedRegisteredStudents = localStorage.getItem('rrbRegisteredStudents');
-                    const storedRegDate = localStorage.getItem('rrbRegistrationDate');
-                    const storedExamDate = localStorage.getItem('rrbExamDate');
-                    const storedExamStartTime = localStorage.getItem('rrbExamStartTime');
-                    const storedExamEndTime = localStorage.getItem('rrbExamEndTime');
-                    const storedDuration = localStorage.getItem('rrbQuizDuration');
+                const configRef = doc(db, "quiz", "config");
+                const unsubscribeConfig = onSnapshot(configRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        setQuizData(data.quizData || DEFAULT_QUIZ_DATA);
+                        setQuizTitle(data.quizTitle || DEFAULT_QUIZ_TITLE);
+                        setRegistrationDate(data.registrationDate || null);
+                        setExamDate(data.examDate || null);
+                        setExamStartTime(data.examStartTime || null);
+                        setExamEndTime(data.examEndTime || null);
+                        setQuizDuration(data.quizDuration || 3600);
+                    } else {
+                        // If no config exists, create one with default values
+                        setDoc(configRef, {
+                            quizData: DEFAULT_QUIZ_DATA,
+                            quizTitle: DEFAULT_QUIZ_TITLE,
+                            registrationDate: null,
+                            examDate: null,
+                            examStartTime: null,
+                            examEndTime: null,
+                            quizDuration: 3600,
+                        });
+                    }
+                    setIsLoading(false);
+                });
 
-                    if (storedData) setQuizData(JSON.parse(storedData));
-                    if (storedTitle) setQuizTitle(storedTitle);
-                    if (storedReports) setStudentReports(JSON.parse(storedReports));
-                    if (storedRegisteredStudents) setRegisteredStudents(JSON.parse(storedRegisteredStudents));
-                    if (storedRegDate) setRegistrationDate(storedRegDate);
-                    if (storedExamDate) setExamDate(storedExamDate);
-                    if (storedExamStartTime) setExamStartTime(storedExamStartTime);
-                    if (storedExamEndTime) setExamEndTime(storedExamEndTime);
-                    if (storedDuration) setQuizDuration(JSON.parse(storedDuration));
-                } catch (e) { console.error("Failed to load data from localStorage", e); }
+                const reportsRef = collection(db, "reports");
+                const unsubscribeReports = onSnapshot(reportsRef, (snapshot) => {
+                    const reports = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setStudentReports(reports);
+                });
+
+                const studentsRef = collection(db, "registeredStudents");
+                const unsubscribeStudents = onSnapshot(studentsRef, (snapshot) => {
+                    const students = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setRegisteredStudents(students);
+                });
+
+                // Cleanup listeners on unmount
+                return () => {
+                    unsubscribeConfig();
+                    unsubscribeReports();
+                    unsubscribeStudents();
+                };
             }, []);
             
             const loginAdmin = () => { setIsAdminLoggedIn(true); setView('admin'); };
             const logoutAdmin = () => { setIsAdminLoggedIn(false); setView('student'); };
             const showInfo = (message) => { setInfoMessage(message); setIsInfoModalOpen(true); };
 
-            const saveData = React.useCallback(() => {
+            const saveData = React.useCallback(async () => {
+                const configRef = doc(db, "quiz", "config");
                 try {
-                    localStorage.setItem('rrbQuizData', JSON.stringify(quizData));
-                    localStorage.setItem('rrbQuizTitle', quizTitle);
-                    localStorage.setItem('rrbQuizReports', JSON.stringify(studentReports));
-                    localStorage.setItem('rrbRegisteredStudents', JSON.stringify(registeredStudents));
-                    if (registrationDate) localStorage.setItem('rrbRegistrationDate', registrationDate); else localStorage.removeItem('rrbRegistrationDate');
-                    if (examDate) localStorage.setItem('rrbExamDate', examDate); else localStorage.removeItem('rrbExamDate');
-                    if (examStartTime) localStorage.setItem('rrbExamStartTime', examStartTime); else localStorage.removeItem('rrbExamStartTime');
-                    if (examEndTime) localStorage.setItem('rrbExamEndTime', examEndTime); else localStorage.removeItem('rrbExamEndTime');
-                    localStorage.setItem('rrbQuizDuration', JSON.stringify(quizDuration));
-                } catch (e) { showInfo("Could not save data. Your browser might be in private mode or storage is full."); }
-            }, [quizData, quizTitle, studentReports, registeredStudents, registrationDate, examDate, examStartTime, examEndTime, quizDuration]);
+                    await setDoc(configRef, {
+                        quizData,
+                        quizTitle,
+                        registrationDate,
+                        examDate,
+                        examStartTime,
+                        examEndTime,
+                        quizDuration
+                    }, { merge: true });
+                } catch (e) {
+                    showInfo("Could not save data to the cloud. Check your connection and Firebase setup.");
+                    console.error("Firebase save error: ", e);
+                }
+            }, [quizData, quizTitle, registrationDate, examDate, examStartTime, examEndTime, quizDuration]);
             
-            const addSubject = (name) => setQuizData(prev => ({ ...prev, [name]: { questions: [] } }));
-            const deleteSubject = (name) => setQuizData(prev => { const newData = { ...prev }; delete newData[name]; return newData; });
-            const updateQuestion = (subject, question, index) => { setQuizData(prev => { const newQuestions = [...prev[subject].questions]; if (index !== null) newQuestions[index] = question; else newQuestions.push(question); return { ...prev, [subject]: { questions: newQuestions } }; }); };
-            const deleteQuestion = (subject, index) => setQuizData(prev => ({ ...prev, [subject]: { questions: prev[subject].questions.filter((_, i) => i !== index) } }));
-            
-            const registerStudent = (student) => {
-                const isDuplicate = registeredStudents.some(s => s.email.toLowerCase() === student.email.toLowerCase());
-                if (isDuplicate) { showInfo("A student with this email is already registered."); return false; }
-                setRegisteredStudents(prev => { const newStudents = [...prev, student]; try { localStorage.setItem('rrbRegisteredStudents', JSON.stringify(newStudents)); } catch (e) { console.error("Failed to save registered students", e); } return newStudents; });
-                showInfo("Registration successful! You may now go to the Student View to log in.");
-                return true;
+            const addSubject = (name) => {
+                const newQuizData = { ...quizData, [name]: { questions: [] } };
+                setQuizData(newQuizData);
+            };
+
+            const deleteSubject = (name) => {
+                const newQuizData = { ...quizData };
+                delete newQuizData[name];
+                setQuizData(newQuizData);
+            };
+
+            const updateQuestion = (subject, question, index) => {
+                const newQuestions = [...quizData[subject].questions];
+                if (index !== null) {
+                    newQuestions[index] = question;
+                } else {
+                    newQuestions.push(question);
+                }
+                const newQuizData = { ...quizData, [subject]: { questions: newQuestions } };
+                setQuizData(newQuizData);
+            };
+
+            const deleteQuestion = (subject, index) => {
+                const newQuestions = quizData[subject].questions.filter((_, i) => i !== index);
+                const newQuizData = { ...quizData, [subject]: { questions: newQuestions } };
+                setQuizData(newQuizData);
             };
             
-            const saveStudentReport = (report) => {
-                setStudentReports(prev => {
-                    const newReports = [...prev, report];
-                    try { localStorage.setItem('rrbQuizReports', JSON.stringify(newReports)); } catch (e) { console.error("Failed to save student report", e); }
-                    return newReports;
-                });
+            const registerStudent = async (student) => {
+                const isDuplicate = registeredStudents.some(s => s.email.toLowerCase() === student.email.toLowerCase());
+                if (isDuplicate) {
+                    showInfo("A student with this email is already registered.");
+                    return false;
+                }
+                try {
+                    await addDoc(collection(db, "registeredStudents"), student);
+                    showInfo("Registration successful! You may now go to the Student View to log in.");
+                    return true;
+                } catch (e) {
+                    showInfo("Registration failed. Could not save to the database.");
+                    console.error("Firebase registration error: ", e);
+                    return false;
+                }
+            };
+            
+            const saveStudentReport = async (report) => {
+                try {
+                    await addDoc(collection(db, "reports"), report);
+                } catch (e) {
+                    showInfo("Could not save your report. Please check your internet connection.");
+                    console.error("Firebase report saving error: ", e);
+                }
             };
 
             const value = {
-                quizData, quizTitle, studentReports, registeredStudents, registrationDate, examDate, examStartTime, examEndTime, quizDuration, setQuizData, setQuizTitle, addSubject, deleteSubject, updateQuestion, deleteQuestion, saveData, registerStudent, saveStudentReport, showInfo, setRegistrationDate, setExamDate, setExamStartTime, setExamEndTime, setQuizDuration, view, setView, isAdminLoggedIn, loginAdmin, logoutAdmin
+                quizData, quizTitle, studentReports, registeredStudents, registrationDate, examDate, examStartTime, examEndTime, quizDuration, setQuizData, setQuizTitle, addSubject, deleteSubject, updateQuestion, deleteQuestion, saveData, registerStudent, saveStudentReport, showInfo, setRegistrationDate, setExamDate, setExamStartTime, setExamEndTime, setQuizDuration, view, setView, isAdminLoggedIn, loginAdmin, logoutAdmin, isLoading
             };
 
             return (
@@ -1546,7 +1527,16 @@
         };
 
         const AppLayout = () => {
-            const { view, isAdminLoggedIn } = useQuiz();
+            const { view, isAdminLoggedIn, isLoading } = useQuiz();
+            
+            if (isLoading) {
+                return (
+                    <div className="flex justify-center items-center h-screen">
+                        <div className="text-xl font-semibold">Loading Quiz...</div>
+                    </div>
+                );
+            }
+
             return (
                 <>
                     <Header />
@@ -1580,6 +1570,5 @@
         );
 
     </script>
-<script type="module" src="/index.tsx"></script>
 </body>
 </html>
